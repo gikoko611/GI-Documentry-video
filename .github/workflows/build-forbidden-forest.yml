@@ -1,0 +1,45 @@
+name: Build Forbidden Forest Reel
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        name: Checkout source
+      - name: Install FFmpeg and Myanmar fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-core fonts-noto-extra
+      - uses: actions/setup-python@v5
+        name: Set up Python
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install Python packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Render five-minute vertical documentary
+        run: python render_forbidden_forest.py
+      - name: Verify MP4
+        run: |
+          ffprobe -v error -show_entries stream=codec_name,width,height,r_frame_rate -show_entries format=duration,size -of json output/forbidden_forest_gi_koko_720x1280.mp4
+      - uses: actions/upload-artifact@v4
+        name: Upload MP4 artifact
+        with:
+          name: forbidden-forest-reel
+          path: |
+            output/forbidden_forest_gi_koko_720x1280.mp4
+            assets/gi_logo.png
+            assets/ATTRIBUTION.txt
+          if-no-files-found: error
+          retention-days: 14
