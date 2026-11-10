@@ -46,6 +46,28 @@ def allowed_license(meta):
     lic = clean_html(meta.get("LicenseShortName", {}).get("value", "")).upper()
     return ("PUBLIC DOMAIN" in lic or "CC0" in lic or "CC BY" in lic) and "NC" not in lic and "ND" not in lic
 
+def commons_get(url, **kwargs):
+    """Respect Wikimedia rate limits and retry transient 429/5xx responses."""
+    last_error = None
+    for attempt in range(7):
+        try:
+            response = requests.get(url, **kwargs)
+            if response.status_code == 429 or response.status_code >= 500:
+                wait = min(60, 5 * (2 ** attempt))
+                print(f"Wikimedia HTTP {response.status_code}; retrying in {wait}s (attempt {attempt + 1}/7)")
+                time.sleep(wait)
+                last_error = RuntimeError(f"Wikimedia HTTP {response.status_code}")
+                continue
+            response.raise_for_status()
+            return response
+        except requests.RequestException as exc:
+            last_error = exc
+            if attempt < 6:
+                wait = min(60, 5 * (2 ** attempt))
+                print(f"Wikimedia request issue: {exc}; retrying in {wait}s")
+                time.sleep(wait)
+    raise RuntimeError(f"Wikimedia request failed after retries: {last_error}")
+
 def fetch_commons_image(queries, index, used_hashes, exact_title=None):
     if isinstance(queries, str):
         queries = [queries]
@@ -63,7 +85,7 @@ def fetch_commons_image(queries, index, used_hashes, exact_title=None):
         if not url or not url.lower().split("?")[0].endswith((".jpg", ".jpeg", ".png", ".webp")):
             return None
         try:
-            image_response = requests.get(url, headers=UA, timeout=60)
+            image_response = commons_get(url, headers=UA, timeout=60)
             image_response.raise_for_status()
             raw = image_response.content
             digest = hashlib.sha256(raw).hexdigest()
@@ -92,7 +114,7 @@ def fetch_commons_image(queries, index, used_hashes, exact_title=None):
     # Prefer an explicitly identified Commons file when one is known.
     if exact_title:
         try:
-            response = requests.get(endpoint, params={
+            response = commons_get(endpoint, params={
                 "action": "query", "titles": exact_title, "prop": "imageinfo",
                 "iiprop": "url|extmetadata", "iiurlwidth": 1800, "format": "json"
             }, headers=UA, timeout=45)
@@ -221,7 +243,7 @@ def main():
     for i, scene in enumerate(STORY, 1):
         source = fetch_commons_image([scene["search"]] + scene.get("search_alt", []), i, used_hashes, scene.get("commons_title"))
         scene_images.append(prepare_image(source, i, scene["plant"]))
-        time.sleep(0.35)
+        time.sleep(2.0)
 
     print("STEP 2/5 — Generating narration with Deepgram Aura-2...")
     raw_audio = []
