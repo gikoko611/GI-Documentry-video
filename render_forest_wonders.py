@@ -274,12 +274,13 @@ def main():
     print("STEP 3/5 — Timing every Myanmar subtitle to its exact Deepgram line audio...")
     processed_durations = []
     for idx, record in enumerate(line_records):
-        adjusted = WORK / f"timed_{idx+1:03d}.mp3"
-        # Apply one consistent tempo factor to every narration line. A per-last-line
-        # correction can demand extreme speed changes and break subtitle/audio sync.
+        # Use lossless PCM WAV intermediates. Encoding many short MP3 files separately
+        # adds encoder delay/padding to every line and accumulates timing drift.
+        # WAV keeps sample-accurate subtitle timing across the full narration.
+        adjusted = WORK / f"timed_{idx+1:03d}.wav"
         line_tempo = tempo
         run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(record["raw"]),
-             "-af", f"atempo={line_tempo:.8f}", "-c:a", "libmp3lame", "-b:a", "128k", str(adjusted)])
+             "-af", f"atempo={line_tempo:.8f}", "-c:a", "pcm_s16le", str(adjusted)])
         duration = probe_duration(adjusted)
         record["audio"] = adjusted
         record["duration"] = duration
@@ -300,9 +301,9 @@ def main():
     srt_path.write_text("\n".join(srt_entries), encoding="utf-8-sig")
     concat_audio_list = WORK / "audio_concat.txt"
     concat_audio_list.write_text("".join(f"file '{r['audio'].resolve()}'\n" for r in line_records), encoding="utf-8")
-    narration = WORK / "narration_10min.mp3"
+    narration = WORK / "narration_10min.wav"
     run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0",
-         "-i", str(concat_audio_list), "-c:a", "libmp3lame", "-b:a", "128k", str(narration)])
+         "-i", str(concat_audio_list), "-c:a", "pcm_s16le", str(narration)])
 
     print("STEP 4/5 — Rendering 2.5D-style moving botanical scenes...")
     scene_video_paths = []
