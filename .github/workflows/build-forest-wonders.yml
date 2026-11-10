@@ -1,0 +1,67 @@
+name: Build Forest Wonders Documentary (10 min)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "forest_wonders_story.json"
+      - "render_forest_wonders.py"
+      - ".github/workflows/build-forest-wonders.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install FFmpeg and Myanmar Unicode fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-sil-padauk fonts-noto-core fonts-noto-extra
+
+      - name: Confirm Myanmar font availability
+        run: |
+          fc-match Padauk
+          fc-match "Noto Sans Myanmar"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests Pillow
+
+      - name: Render 10-minute documentary with Deepgram
+        env:
+          DEEPGRAM_API_KEY: ${{ secrets.DEEPGRAM_API_KEY }}
+          DEEPGRAM_TTS_MODEL: aura-2-orion-en
+        run: python render_forest_wonders.py
+
+      - name: Verify MP4 and thumbnail
+        run: |
+          test -s output/forest_wonders_10min_gi_koko_720x1280.mp4
+          test -s output/GI-KO-KO-FOREST-WONDERS-THUMBNAIL.jpg
+          ffprobe -v error -show_entries stream=codec_name,width,height,r_frame_rate -show_entries format=duration,size -of json output/forest_wonders_10min_gi_koko_720x1280.mp4
+          identify output/GI-KO-KO-FOREST-WONDERS-THUMBNAIL.jpg || file output/GI-KO-KO-FOREST-WONDERS-THUMBNAIL.jpg
+
+      - name: Upload MP4, thumbnail, and image credits
+        uses: actions/upload-artifact@v4
+        with:
+          name: forest-wonders-10min
+          path: |
+            output/forest_wonders_10min_gi_koko_720x1280.mp4
+            output/GI-KO-KO-FOREST-WONDERS-THUMBNAIL.jpg
+            assets/ATTRIBUTION_FOREST_WONDERS.txt
+            assets/RESEARCH_SOURCES_FOREST_WONDERS.md
+          if-no-files-found: error
+          retention-days: 14
