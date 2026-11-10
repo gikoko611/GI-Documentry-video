@@ -1,0 +1,47 @@
+name: Publish Forbidden Forest MP4 Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/publish-mp4-release.yml"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download successful render artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: forbidden-forest-reel
+          path: release-assets
+          repository: gikoko611/GI-Documentry-video
+          run-id: 42845350702
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify direct MP4 file
+        run: |
+          find release-assets -maxdepth 4 -type f -print
+          MP4="$(find release-assets -type f -name 'forbidden_forest_gi_koko_720x1280.mp4' -print -quit)"
+          test -n "$MP4"
+          mkdir -p release-upload
+          cp "$MP4" release-upload/GI-KO-KO-FORBIDDEN-FOREST-720x1280.mp4
+          ffprobe -v error -show_entries format=duration,size -of json release-upload/GI-KO-KO-FORBIDDEN-FOREST-720x1280.mp4
+
+      - name: Publish GitHub Release with MP4 only
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.0.1
+          name: G.I KO KO Documentary Studio - Forbidden Forest v0.0.1
+          body: |
+            Five-minute vertical Forbidden Forest documentary.
+            Format: MP4 (H.264/AAC), 720x1280, 24 FPS.
+            Direct MP4 download; no ZIP bundle.
+          draft: false
+          prerelease: false
+          files: release-upload/GI-KO-KO-FORBIDDEN-FOREST-720x1280.mp4
