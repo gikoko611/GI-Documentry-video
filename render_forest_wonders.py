@@ -82,7 +82,7 @@ def fetch_commons_image(queries, index, used_hashes, exact_title=None):
             source_url = info.get("descriptionurl", "")
             title = page.get("title", "Untitled Commons image")
             with (ASSETS / "ATTRIBUTION_FOREST_WONDERS.txt").open("a", encoding="utf-8") as f:
-                f.write(f"Scene {index:02d} — {title}\\nAuthor: {artist}\\nLicense: {license_name}\\nSource: {source_url}\\n\\n")
+                f.write(f"Scene {index:02d} — {title}\nAuthor: {artist}\nLicense: {license_name}\nSource: {source_url}\n\n")
             print(f"IMAGE {index:02d}/{len(STORY)}: {title} [{license_name}]")
             return target
         except Exception as exc:
