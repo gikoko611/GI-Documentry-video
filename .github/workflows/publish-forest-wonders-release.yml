@@ -1,0 +1,67 @@
+name: Publish Forest Wonders MP4 Release
+
+on:
+  workflow_run:
+    workflows: ["Build Forest Wonders Documentary (10 min)"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download successful documentary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: forest-wonders-10min
+          path: release-assets
+          repository: gikoko611/GI-Documentry-video
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install media probe
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Verify and prepare release files
+        run: |
+          find release-assets -maxdepth 4 -type f -print
+          MP4="$(find release-assets -type f -name 'forest_wonders_10min_gi_koko_720x1280.mp4' -print -quit)"
+          THUMB="$(find release-assets -type f -name 'GI-KO-KO-FOREST-WONDERS-THUMBNAIL.jpg' -print -quit)"
+          CREDITS="$(find release-assets -type f -name 'ATTRIBUTION_FOREST_WONDERS.txt' -print -quit)"
+          SOURCES="$(find release-assets -type f -name 'RESEARCH_SOURCES_FOREST_WONDERS.md' -print -quit)"
+          test -n "$MP4" && test -n "$THUMB" && test -n "$CREDITS" && test -n "$SOURCES"
+          mkdir -p release-upload
+          cp "$MP4" release-upload/GI-KO-KO-FOREST-WONDERS-10MIN-720x1280.mp4
+          cp "$THUMB" release-upload/GI-KO-KO-FOREST-WONDERS-THUMBNAIL.jpg
+          cp "$CREDITS" release-upload/IMAGE-CREDITS.txt
+          cp "$SOURCES" release-upload/RESEARCH-SOURCES.md
+          ffprobe -v error -show_entries stream=codec_name,width,height,r_frame_rate -show_entries format=duration,size -of json release-upload/GI-KO-KO-FOREST-WONDERS-10MIN-720x1280.mp4
+          file release-upload/GI-KO-KO-FOREST-WONDERS-THUMBNAIL.jpg
+
+      - name: Publish v0.0.2 release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.0.2
+          name: G.I KO KO — The Hidden Wonders of the Forest v0.0.2
+          body: |
+            Ten-minute botanical nature documentary.
+            Narration: Deepgram Aura-2 (English).
+            Subtitles: Myanmar Unicode (Padauk), timed to each generated narration line.
+            Visuals: 15 distinct licensed Wikimedia Commons photographs with motion-camera animation.
+            Format: MP4, H.264/AAC, 720x1280, 24 FPS.
+            Includes an automatically generated 16:9 thumbnail and image attribution.
+            Direct MP4 download; no ZIP bundle.
+          draft: false
+          prerelease: false
+          files: |
+            release-upload/GI-KO-KO-FOREST-WONDERS-10MIN-720x1280.mp4
+            release-upload/GI-KO-KO-FOREST-WONDERS-THUMBNAIL.jpg
+            release-upload/IMAGE-CREDITS.txt
+            release-upload/RESEARCH-SOURCES.md
