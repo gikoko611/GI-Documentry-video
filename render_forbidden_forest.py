@@ -70,7 +70,7 @@ def get_image(query,index):
             r=requests.get(url,headers=headers,timeout=40); r.raise_for_status()
             (IMAGES/f"source_{index:02d}").write_bytes(r.content)
             with (ASSETS/"ATTRIBUTION.txt").open("a",encoding="utf-8") as f:
-                f.write(f"Scene {index}: {page.get('title','')} | {lic} | {meta.get('Artist',{}).get('value','Unknown')} | {info.get('descriptionurl','')}\\n")
+                f.write(f"Scene {index}: {page.get('title','')} | {lic} | {meta.get('Artist',{}).get('value','Unknown')} | {info.get('descriptionurl','')}\n")
             return Image.open(IMAGES/f"source_{index:02d}").convert("RGB")
     except Exception as e: print(f"Image lookup fallback scene {index}: {e}")
     return fallback_forest()
@@ -87,13 +87,13 @@ def stamp(sec):
     return f"{h:02}:{m:02}:{s:02},{ms:03}"
 
 def local_srt(item,path):
-    words=item["en"].split(); mid=max(1,len(words)//2); mm=item["mm"]; mmid=max(1,len(mm)//2)
+    words=item["en"].split(); mid=max(1,len(words)//2); mm_words=item["mm"].split(); mmid=max(1,len(mm_words)//2)
     entries=[]
     for n,(a,b) in enumerate(((0,15),(15,30))):
         en=" ".join(words[:mid]) if n==0 else " ".join(words[mid:])
-        my=mm[:mmid] if n==0 else mm[mmid:]
-        entries += [str(n+1),f"{stamp(a)} --> {stamp(b)}",en+"\\n"+my,""]
-    path.write_text("\\n".join(entries),encoding="utf-8")
+        my=" ".join(mm_words[:mmid]) if n==0 else " ".join(mm_words[mmid:])
+        entries += [str(n+1),f"{stamp(a)} --> {stamp(b)}",en+"\n"+my,""]
+    path.write_text("\n".join(entries),encoding="utf-8")
 
 async def generate_speech():
     for i,item in enumerate(STORY,1):
@@ -106,7 +106,7 @@ def main():
     for tool in ("ffmpeg","ffprobe"):
         if subprocess.call(["bash","-lc",f"command -v {tool} >/dev/null 2>&1"])!=0: raise SystemExit(f"Missing {tool}")
     WORK.mkdir(exist_ok=True); OUT.mkdir(exist_ok=True); IMAGES.mkdir(parents=True,exist_ok=True)
-    logo=make_logo(); (ASSETS/"ATTRIBUTION.txt").write_text("Reusable image credits (Wikimedia Commons).\\n",encoding="utf-8")
+    logo=make_logo(); (ASSETS/"ATTRIBUTION.txt").write_text("Reusable image credits (Wikimedia Commons).\n",encoding="utf-8")
     print("Preparing forest scenes...")
     for i,q in enumerate(QUERIES,1): prepare_image(i,q)
     print("Generating English narration...")
@@ -130,7 +130,7 @@ def main():
              "-pix_fmt","yuv420p","-r","24","-threads","2","-c:a","aac","-b:a","96k",
              "-movflags","+faststart",str(out)])
         clips.append(out); print(f"Rendered scene {i}/10")
-    concat=WORK/"concat.txt"; concat.write_text("".join(f"file '{p.resolve()}'\\n" for p in clips),encoding="utf-8")
+    concat=WORK/"concat.txt"; concat.write_text("".join(f"file '{p.resolve()}'\n" for p in clips),encoding="utf-8")
     joined=WORK/"joined.mp4"
     run(["ffmpeg","-hide_banner","-loglevel","error","-y","-f","concat","-safe","0","-i",str(concat),
          "-c","copy","-movflags","+faststart",str(joined)])
