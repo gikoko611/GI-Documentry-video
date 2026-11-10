@@ -253,13 +253,9 @@ def main():
     processed_durations = []
     for idx, record in enumerate(line_records):
         adjusted = WORK / f"timed_{idx+1:03d}.mp3"
-        if idx < len(line_records) - 1:
-            line_tempo = tempo
-        else:
-            # Make the final line absorb only the tiny encoder/rounding remainder.
-            line_tempo = raw_durations[idx] / max(0.1, TARGET_SECONDS - sum(processed_durations))
-        if not 0.72 <= line_tempo <= 1.28:
-            raise RuntimeError(f"Final pacing correction is outside safe range: {line_tempo:.3f}")
+        # Apply one consistent tempo factor to every narration line. A per-last-line
+        # correction can demand extreme speed changes and break subtitle/audio sync.
+        line_tempo = tempo
         run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(record["raw"]),
              "-af", f"atempo={line_tempo:.8f}", "-c:a", "libmp3lame", "-b:a", "128k", str(adjusted)])
         duration = probe_duration(adjusted)
