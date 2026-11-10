@@ -50,7 +50,7 @@ def fetch_commons_image(query, index, used_hashes):
     endpoint = "https://commons.wikimedia.org/w/api.php"
     params = {
         "action": "query", "generator": "search", "gsrsearch": query,
-        "gsrnamespace": 6, "gsrlimit": 30, "prop": "imageinfo",
+        "gsrnamespace": 6, "gsrlimit": 50, "prop": "imageinfo",
         "iiprop": "url|extmetadata", "iiurlwidth": 1800, "format": "json"
     }
     response = requests.get(endpoint, params=params, headers=UA, timeout=45)
@@ -58,7 +58,14 @@ def fetch_commons_image(query, index, used_hashes):
     pages = response.json().get("query", {}).get("pages", {})
     candidates = list(pages.values())
     for page in candidates:
+        page_title = page.get("title", "").lower()
+        # Commons also returns PDF book/report thumbnails as JPEG previews; never use those.
+        if not page_title.endswith((".jpg", ".jpeg", ".png", ".webp")):
+            continue
         info = page.get("imageinfo", [{}])[0]
+        mime = str(info.get("mime", "")).lower()
+        if mime and not mime.startswith("image/"):
+            continue
         meta = info.get("extmetadata", {})
         if not allowed_license(meta):
             continue
