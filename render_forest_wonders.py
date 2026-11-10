@@ -46,57 +46,63 @@ def allowed_license(meta):
     lic = clean_html(meta.get("LicenseShortName", {}).get("value", "")).upper()
     return ("PUBLIC DOMAIN" in lic or "CC0" in lic or "CC BY" in lic) and "NC" not in lic and "ND" not in lic
 
-def fetch_commons_image(query, index, used_hashes):
+def fetch_commons_image(queries, index, used_hashes):
+    if isinstance(queries, str):
+        queries = [queries]
     endpoint = "https://commons.wikimedia.org/w/api.php"
-    params = {
-        "action": "query", "generator": "search", "gsrsearch": query,
-        "gsrnamespace": 6, "gsrlimit": 50, "prop": "imageinfo",
-        "iiprop": "url|extmetadata", "iiurlwidth": 1800, "format": "json"
-    }
-    response = requests.get(endpoint, params=params, headers=UA, timeout=45)
-    response.raise_for_status()
-    pages = response.json().get("query", {}).get("pages", {})
-    candidates = list(pages.values())
-    for page in candidates:
-        page_title = page.get("title", "").lower()
-        # Commons also returns PDF book/report thumbnails as JPEG previews; never use those.
-        if not page_title.endswith((".jpg", ".jpeg", ".png", ".webp")):
-            continue
-        info = page.get("imageinfo", [{}])[0]
-        mime = str(info.get("mime", "")).lower()
-        if mime and not mime.startswith("image/"):
-            continue
-        meta = info.get("extmetadata", {})
-        if not allowed_license(meta):
-            continue
-        url = info.get("thumburl") or info.get("url")
-        if not url or not url.lower().split("?")[0].endswith((".jpg", ".jpeg", ".png", ".webp")):
-            continue
+    for query in queries:
+        params = {
+            "action": "query", "generator": "search", "gsrsearch": query + " filetype:bitmap",
+            "gsrnamespace": 6, "gsrlimit": 50, "prop": "imageinfo",
+            "iiprop": "url|extmetadata", "iiurlwidth": 1800, "format": "json"
+        }
         try:
-            image_response = requests.get(url, headers=UA, timeout=60)
-            image_response.raise_for_status()
-            raw = image_response.content
-            digest = hashlib.sha256(raw).hexdigest()
-            if digest in used_hashes:
-                continue
-            im = Image.open(__import__("io").BytesIO(raw))
-            if im.width < 700 or im.height < 500:
-                continue
-            im.verify()
-            used_hashes.add(digest)
-            target = IMAGES / f"source_{index:02d}.jpg"
-            Image.open(__import__("io").BytesIO(raw)).convert("RGB").save(target, quality=94)
-            artist = clean_html(meta.get("Artist", {}).get("value", "Unknown author"))
-            license_name = clean_html(meta.get("LicenseShortName", {}).get("value", "License not stated"))
-            source_url = info.get("descriptionurl", "")
-            title = page.get("title", "Untitled Commons image")
-            with (ASSETS / "ATTRIBUTION_FOREST_WONDERS.txt").open("a", encoding="utf-8") as f:
-                f.write(f"Scene {index:02d} — {title}\nAuthor: {artist}\nLicense: {license_name}\nSource: {source_url}\n\n")
-            print(f"IMAGE {index:02d}/{len(STORY)}: {title} [{license_name}]")
-            return target
+            response = requests.get(endpoint, params=params, headers=UA, timeout=45)
+            response.raise_for_status()
+            pages = response.json().get("query", {}).get("pages", {})
         except Exception as exc:
-            print(f"Skipping Commons candidate: {exc}")
-    raise RuntimeError(f"No unique reusable Wikimedia Commons image found for: {query}")
+            print(f"Commons search fallback for '{query}': {exc}")
+            continue
+        candidates = list(pages.values())
+        for page in candidates:
+            page_title = page.get("title", "").lower()
+            # Commons also returns PDF book/report thumbnails as JPEG previews; never use those.
+            if not page_title.endswith((".jpg", ".jpeg", ".png", ".webp")):
+                continue
+            info = page.get("imageinfo", [{}])[0]
+            meta = info.get("extmetadata", {})
+            if not allowed_license(meta):
+                continue
+            url = info.get("thumburl") or info.get("url")
+            if not url or not url.lower().split("?")[0].endswith((".jpg", ".jpeg", ".png", ".webp")):
+                continue
+            try:
+                image_response = requests.get(url, headers=UA, timeout=60)
+                image_response.raise_for_status()
+                raw = image_response.content
+                digest = hashlib.sha256(raw).hexdigest()
+                if digest in used_hashes:
+                    continue
+                import io
+                im = Image.open(io.BytesIO(raw))
+                if im.width < 700 or im.height < 500:
+                    continue
+                im.verify()
+                used_hashes.add(digest)
+                target = IMAGES / f"source_{index:02d}.jpg"
+                Image.open(io.BytesIO(raw)).convert("RGB").save(target, quality=94)
+                artist = clean_html(meta.get("Artist", {}).get("value", "Unknown author"))
+                license_name = clean_html(meta.get("LicenseShortName", {}).get("value", "License not stated"))
+                source_url = info.get("descriptionurl", "")
+                title = page.get("title", "Untitled Commons image")
+                with (ASSETS / "ATTRIBUTION_FOREST_WONDERS.txt").open("a", encoding="utf-8") as f:
+                    f.write(f"Scene {index:02d} — {title}\\nAuthor: {artist}\\nLicense: {license_name}\\nSource: {source_url}\\n\\n")
+                print(f"IMAGE {index:02d}/{len(STORY)}: {title} [{license_name}] via '{query}'")
+                return target
+            except Exception as exc:
+                print(f"Skipping Commons candidate for '{query}': {exc}")
+        print(f"No suitable image found for search term: {query}; trying next alternative.")
+    raise RuntimeError(f"No unique reusable Wikimedia Commons image found for scene {index}: {queries}")
 
 def prepare_image(source, index, title):
     im = Image.open(source).convert("RGB")
@@ -191,7 +197,7 @@ def main():
     used_hashes = set()
     scene_images = []
     for i, scene in enumerate(STORY, 1):
-        source = fetch_commons_image(scene["search"], i, used_hashes)
+        source = fetch_commons_image([scene["search"]] + scene.get("search_alt", []), i, used_hashes)
         scene_images.append(prepare_image(source, i, scene["plant"]))
         time.sleep(0.35)
 
