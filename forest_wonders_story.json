@@ -2,7 +2,7 @@
   {
     "title": "THE FOREST BREATHES",
     "plant": "The Living Rainforest",
-    "search": "tropical rainforest canopy mist sunlight aerial forest",
+    "search": "tropical rainforest canopy forest landscape trees",
     "lines": [
       [
         "A tropical rainforest is not simply a collection of trees; it is a living architecture, built in layers where light, water, and life compete.",
@@ -25,7 +25,7 @@
   {
     "title": "THE GIANT CORPSE FLOWER",
     "plant": "Rafflesia arnoldii",
-    "search": "Rafflesia arnoldii flower rainforest",
+    "search": "Rafflesia arnoldii flower",
     "lines": [
       [
         "Hidden among the forests of Southeast Asia, Rafflesia produces one of the largest individual flowers known to science, sometimes approaching a metre across.",
@@ -48,7 +48,7 @@
   {
     "title": "THE TITAN ARUM",
     "plant": "Amorphophallus titanum",
-    "search": "Amorphophallus titanum titan arum bloom",
+    "search": "Amorphophallus titanum titan arum flower",
     "lines": [
       [
         "Another Sumatran rainforest giant is the titan arum, famous for its enormous flowering structure and the smell that gives it the nickname corpse flower.",
@@ -71,7 +71,7 @@
   {
     "title": "THE PITCHER TRAP",
     "plant": "Nepenthes",
-    "search": "Nepenthes tropical pitcher plant rainforest",
+    "search": "Nepenthes pitcher plant",
     "lines": [
       [
         "Look closely at the hanging pitchers of Nepenthes: they are not flowers, but modified leaves shaped into elegant traps.",
@@ -94,7 +94,7 @@
   {
     "title": "A GIANT CUP",
     "plant": "Nepenthes rajah",
-    "search": "Nepenthes rajah large pitcher plant Borneo",
+    "search": "Nepenthes rajah pitcher",
     "lines": [
       [
         "On the mountain slopes of Borneo grows Nepenthes rajah, a remarkable pitcher plant with some of the largest traps in its genus.",
@@ -117,7 +117,7 @@
   {
     "title": "THE STICKY HUNTER",
     "plant": "Drosera Sundew",
-    "search": "Drosera sundew sticky tentacles insect plant",
+    "search": "Drosera sundew plant",
     "lines": [
       [
         "Sundews look delicate, almost jewel-like, but their leaves are covered with tentacles tipped in glistening drops of sticky mucus.",
@@ -140,7 +140,7 @@
   {
     "title": "THE INVISIBLE BLADDER",
     "plant": "Utricularia Bladderwort",
-    "search": "Utricularia bladderwort aquatic carnivorous plant flower",
+    "search": "Utricularia bladderwort plant",
     "lines": [
       [
         "Bladderworts use tiny bladder-shaped traps, some so small that their hunting mechanism is almost invisible without magnification.",
@@ -163,7 +163,7 @@
   {
     "title": "THE TOUCH-ME-NOT",
     "plant": "Mimosa pudica",
-    "search": "Mimosa pudica sensitive plant folded leaves",
+    "search": "Mimosa pudica sensitive plant",
     "lines": [
       [
         "Mimosa pudica is famous for a surprising response: when touched or shaken, its delicate leaflets fold inward and the leaf stalk may droop.",
@@ -186,7 +186,7 @@
   {
     "title": "THE DANCING LEAVES",
     "plant": "Codariocalyx motorius",
-    "search": "Codariocalyx motorius telegraph dancing plant leaves",
+    "search": "Codariocalyx motorius telegraph plant",
     "lines": [
       [
         "The telegraph plant, Codariocalyx motorius, carries tiny side leaflets that can move visibly, tracing small patterns in changing light and temperature.",
@@ -209,7 +209,7 @@
   {
     "title": "THE TREE THAT WRAPS A TREE",
     "plant": "Strangler Fig",
-    "search": "strangler fig aerial roots rainforest tree",
+    "search": "Strangler fig Ficus microcarpa roots",
     "lines": [
       [
         "A strangler fig may begin life high in another tree, where a seed dropped by a bird finds a crack filled with damp organic matter.",
@@ -232,7 +232,7 @@
   {
     "title": "LIVING ABOVE THE GROUND",
     "plant": "Rainforest Epiphytes",
-    "search": "rainforest epiphyte orchids bromeliads tree branches",
+    "search": "rainforest epiphyte orchids bromeliads",
     "lines": [
       [
         "Many rainforest plants never need to root in the forest floor; epiphytes grow on branches, using the tree only as a place to live.",
@@ -255,7 +255,7 @@
   {
     "title": "THE GHOST ORCHID",
     "plant": "Dendrophylax lindenii",
-    "search": "Dendrophylax lindenii ghost orchid flower",
+    "search": "Dendrophylax lindenii ghost orchid",
     "lines": [
       [
         "The ghost orchid is an elusive flowering plant whose pale blooms seem to float in humid forest air, supported by roots attached to trees.",
@@ -278,7 +278,7 @@
   {
     "title": "THE BAT FLOWER",
     "plant": "Tacca chantrieri",
-    "search": "Tacca chantrieri black bat flower plant",
+    "search": "Tacca chantrieri black bat flower",
     "lines": [
       [
         "The black bat flower, Tacca chantrieri, produces dark blossoms with long whisker-like bracts that resemble the wings and tails of a bat.",
@@ -301,7 +301,7 @@
   {
     "title": "THE PARASITE THAT STEALS LIGHT",
     "plant": "Dodder Vine",
-    "search": "Cuscuta dodder parasitic vine plant host",
+    "search": "Cuscuta dodder parasitic vine",
     "lines": [
       [
         "Dodder vines begin as tiny seedlings, but once they find a suitable host, they coil around its stem and attach specialised feeding structures.",
@@ -324,7 +324,7 @@
   {
     "title": "A FOREST OF PARTNERSHIPS",
     "plant": "Pollination and Symbiosis",
-    "search": "tropical rainforest orchid pollinator bee flower macro",
+    "search": "tropical rainforest orchid bee pollination",
     "lines": [
       [
         "A rainforest plant rarely survives alone; fungi, insects, birds, and mammals can all become partners in its life cycle.",
@@ -347,7 +347,7 @@
   {
     "title": "THE FUTURE OF THE FOREST",
     "plant": "Conservation",
-    "search": "tropical rainforest conservation forest canopy sunlight",
+    "search": "rainforest conservation tropical forest",
     "lines": [
       [
         "The strangest plants are not curiosities to collect; they are living pieces of ecosystems shaped by millions of years of change.",
