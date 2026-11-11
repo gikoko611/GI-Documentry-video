@@ -177,7 +177,7 @@ def make_subtitle(text, audio_seconds, path):
             wrapped.append(current)
         if not wrapped:
             wrapped = [sentence]
-        caption = r"\N".join(wrapped[:2])
+        caption = "\n".join(wrapped[:2])
         lines.append(f"{i+1}\n{srt_stamp(cursor)} --> {srt_stamp(end)}\n{caption}\n")
         cursor = end
     path.write_text("\n".join(lines), encoding="utf-8")
