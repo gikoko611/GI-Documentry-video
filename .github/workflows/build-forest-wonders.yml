@@ -23,12 +23,22 @@ jobs:
       - name: Install FFmpeg and Myanmar Unicode fonts
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-sil-padauk fonts-noto-core fonts-noto-extra
+          sudo apt-get install -y ffmpeg libass9 libharfbuzz0b libfribidi0 fonts-sil-padauk fonts-noto-core fonts-noto-extra
 
-      - name: Confirm Myanmar font availability
+      - name: Verify Myanmar font and complex-script shaping support
+        shell: bash
         run: |
-          fc-match Padauk
-          fc-match "Noto Sans Myanmar"
+          set -euo pipefail
+          FONT_FILE="$(fc-match -f '%{file}' 'Noto Sans Myanmar')"
+          test -s "$FONT_FILE"
+          echo "Noto Sans Myanmar: $FONT_FILE"
+          echo "NOTO_MYANMAR_FONT_DIR=$(dirname "$FONT_FILE")" >> "$GITHUB_ENV"
+          ASS_LIB="$(ldconfig -p | awk '/libass[.]so/{print $NF; exit}')"
+          test -n "$ASS_LIB"
+          ldd "$ASS_LIB" | tee /tmp/libass-deps.txt
+          grep -q 'libharfbuzz' /tmp/libass-deps.txt
+          grep -q 'libfribidi' /tmp/libass-deps.txt
+          ffmpeg -hide_banner -filters | grep subtitles
 
       - name: Set up Python
         uses: actions/setup-python@v5
