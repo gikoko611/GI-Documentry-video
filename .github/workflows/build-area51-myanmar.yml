@@ -1,0 +1,91 @@
+name: Build Area 51 2026 Burmese Documentary
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "area51_story.json"
+      - "render_area51_myanmar.py"
+      - ".github/workflows/build-area51-myanmar.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install FFmpeg and Myanmar Unicode fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libass9 libharfbuzz0b libfribidi0 fonts-sil-padauk fonts-noto-core fonts-noto-extra
+
+      - name: Verify Myanmar font and subtitle renderer
+        shell: bash
+        run: |
+          set -euo pipefail
+          FONT_FILE="$(fc-match -f '%{file}' 'Padauk')"
+          test -s "$FONT_FILE"
+          echo "Padauk font: $FONT_FILE"
+          ASS_LIB="$(ldconfig -p | awk '/libass[.]so/{print $NF; exit}')"
+          test -n "$ASS_LIB"
+          ldd "$ASS_LIB" | tee /tmp/libass-deps.txt
+          grep -q 'libharfbuzz' /tmp/libass-deps.txt
+          grep -q 'libfribidi' /tmp/libass-deps.txt
+          ffmpeg -hide_banner -filters | grep subtitles
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Render 5-minute Burmese documentary
+        env:
+          MYANMAR_TTS_VOICE: my-MM-ThihaNeural
+        run: python render_area51_myanmar.py
+
+      - name: Verify final MP4 and thumbnail
+        run: |
+          set -euo pipefail
+          VIDEO="output/GI-KO-KO-AREA51-2026-MYANMAR-5MIN-720x1280.mp4"
+          THUMB="output/GI-KO-KO-AREA51-2026-THUMBNAIL.jpg"
+          test -s "$VIDEO"
+          test -s "$THUMB"
+          ffprobe -v error -show_entries stream=codec_name,width,height,r_frame_rate -show_entries format=duration,size -of json "$VIDEO"
+          python - <<'PY'
+          import json, subprocess
+          p = "output/GI-KO-KO-AREA51-2026-MYANMAR-5MIN-720x1280.mp4"
+          d = json.loads(subprocess.check_output([
+              "ffprobe", "-v", "error", "-show_entries",
+              "stream=codec_name,width,height,r_frame_rate:format=duration",
+              "-of", "json", p
+          ], text=True))
+          v = next(s for s in d["streams"] if s["codec_type"] == "video")
+          a = next(s for s in d["streams"] if s["codec_type"] == "audio")
+          assert (v["codec_name"], v["width"], v["height"], v["r_frame_rate"]) == ("h264", 720, 1280, "24/1")
+          assert a["codec_name"] == "aac"
+          assert 299 <= float(d["format"]["duration"]) <= 301
+          print("FINAL MP4 QUALITY CHECK PASSED")
+          PY
+
+      - name: Upload MP4, thumbnail, and image credits
+        uses: actions/upload-artifact@v4
+        with:
+          name: area51-2026-burmese-documentary
+          path: |
+            output/GI-KO-KO-AREA51-2026-MYANMAR-5MIN-720x1280.mp4
+            output/GI-KO-KO-AREA51-2026-THUMBNAIL.jpg
+            assets/ATTRIBUTION_AREA51.txt
+          if-no-files-found: error
+          retention-days: 14
