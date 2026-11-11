@@ -177,11 +177,12 @@ def prepare_image(source, index, title):
     return target
 
 def make_brand():
+    # Emerald-green documentary watermark; transparent background keeps it unobtrusive.
     logo = Image.new("RGBA", (300, 112), (0, 0, 0, 0))
     d = ImageDraw.Draw(logo)
-    d.rounded_rectangle((2, 2, 298, 110), radius=18, fill=(2, 14, 11, 175), outline=(211, 187, 120, 210), width=2)
-    d.text((22, 8), "G.I", font=font(52, True), fill=(246, 226, 170, 255), stroke_width=1, stroke_fill=(30, 24, 12, 255))
-    d.text((24, 72), "POWERED BY I KO KO", font=font(14, True), fill=(255, 255, 244, 255))
+    d.rounded_rectangle((2, 2, 298, 110), radius=18, fill=(1, 22, 14, 168), outline=(42, 220, 126, 225), width=2)
+    d.text((22, 8), "G.I", font=font(52, True), fill=(65, 245, 145, 255), stroke_width=1, stroke_fill=(0, 35, 20, 255))
+    d.text((24, 72), "POWERED BY I KO KO", font=font(14, True), fill=(224, 255, 237, 255))
     path = WORK / "brand_gi.png"
     logo.save(path)
     return path
@@ -380,7 +381,8 @@ def main():
         "force_style='FontName=Noto Sans Myanmar,FontSize=24,PrimaryColour=&H00FFFFFF,"
         "OutlineColour=&H00101010,BorderStyle=1,Outline=3,Shadow=1,Alignment=2,MarginV=100'"
     )
-    filter_complex = f"[0:v]{subtitle_filter}[sub];[sub][2:v]overlay=24:24:format=auto[v]"
+    # Keep the green G.I watermark at bottom-right with a 24px safe margin.
+    filter_complex = f"[0:v]{subtitle_filter}[sub];[sub][2:v]overlay=W-w-24:H-h-24:format=auto[v]"
     run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(joined_video),
          "-i", str(narration), "-i", str(brand), "-filter_complex", filter_complex,
          "-map", "[v]", "-map", "1:a:0", "-t", f"{TARGET_SECONDS:.3f}",
@@ -390,7 +392,7 @@ def main():
          "-movflags", "+faststart", str(VIDEO)])
     meta = json.loads(subprocess.check_output([
         "ffprobe", "-v", "error", "-show_entries",
-        "stream=codec_name,width,height,r_frame_rate:format=duration,size",
+        "stream=codec_type,codec_name,width,height,r_frame_rate,duration,sample_rate,channels:format=duration,size",
         "-of", "json", str(VIDEO)
     ], text=True))
     duration = float(meta["format"]["duration"])
@@ -398,17 +400,39 @@ def main():
         raise RuntimeError(f"Final video duration check failed: {duration:.2f}s")
     if (W, H) != (720, 1280):
         raise RuntimeError("Unexpected output dimensions")
+    audio_streams = [s for s in meta.get("streams", []) if s.get("codec_type") == "audio"]
+    if len(audio_streams) != 1:
+        raise RuntimeError(f"Expected exactly one final audio stream; found {len(audio_streams)}")
+    audio_duration = float(audio_streams[0].get("duration") or 0)
+    if audio_duration < 598.0:
+        raise RuntimeError(f"Final audio is too short: {audio_duration:.2f}s; expected about 600s")
+    # Decode the complete AAC track and fail if a long silent gap suggests dropped narration.
+    silence_check = subprocess.run([
+        "ffmpeg", "-hide_banner", "-nostats", "-i", str(VIDEO),
+        "-map", "0:a:0", "-af", "silencedetect=noise=-48dB:d=10",
+        "-f", "null", "-"
+    ], capture_output=True, text=True, check=True)
+    silence_log = silence_check.stderr
+    long_silence = re.findall(r"silence_duration:\s*([0-9.]+)", silence_log)
+    bad_gaps = [float(v) for v in long_silence if float(v) >= 10.0]
+    if bad_gaps:
+        raise RuntimeError(f"Audio continuity check found long silent gaps: {bad_gaps}")
     print(json.dumps({
         "status": "SUCCESS",
         "video": str(VIDEO),
         "thumbnail": str(THUMB),
         "duration_seconds": round(duration, 2),
+        "audio_duration_seconds": round(audio_duration, 2),
+        "audio_codec": audio_streams[0].get("codec_name"),
+        "audio_channels": audio_streams[0].get("channels"),
+        "audio_continuity_check": "PASS — no detected silence gap of 10 seconds or longer",
         "video_size_mb": round(int(meta["format"]["size"]) / 1024 / 1024, 2),
         "resolution": "720x1280",
         "fps": "24",
         "tts": f"Deepgram {TTS_MODEL}",
-        "subtitle_font": "Padauk",
-        "subtitle_alignment": "per-line measured audio duration"
+        "subtitle_font": "Noto Sans Myanmar",
+        "subtitle_alignment": "per-line measured audio duration",
+        "watermark": "Emerald green, bottom-right"
     }, ensure_ascii=False, indent=2))
 
 if __name__ == "__main__":
