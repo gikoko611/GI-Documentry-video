@@ -52,7 +52,8 @@ jobs:
 
       - name: Render 5-minute Burmese documentary
         env:
-          MYANMAR_TTS_VOICE: my-MM-ThihaNeural
+          DEEPGRAM_API_KEY: ${{ secrets.DEEPGRAM_API_KEY }}
+          DEEPGRAM_MODEL: aura-2-orion-en
         run: python render_area51_myanmar.py
 
       - name: Verify final MP4 and thumbnail
