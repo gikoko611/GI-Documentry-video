@@ -4,7 +4,6 @@ import asyncio, hashlib, io, json, os, subprocess, time
 from pathlib import Path
 import requests
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
-import edge_tts
 
 ROOT = Path(__file__).resolve().parent
 ASSETS = ROOT / "assets"
@@ -14,7 +13,8 @@ OUT = ROOT / "output"
 STORY = json.loads((ROOT / "area51_story.json").read_text(encoding="utf-8"))
 W, H, FPS, CLIP = 720, 1280, 24, 30
 VIDEO = OUT / "GI-KO-KO-AREA51-2026-MYANMAR-5MIN-720x1280.mp4"
-VOICE = os.environ.get("MYANMAR_TTS_VOICE", "my-MM-ThihaNeural")
+DEEPGRAM_MODEL = os.environ.get("DEEPGRAM_MODEL", "aura-2-orion-en")
+DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
 UA = {"User-Agent": "GIKOKO-AI-Documentary-Studio/1.0 (educational documentary)"}
 USED = set()
 
@@ -124,15 +124,26 @@ def make_logo():
     logo.save(p)
     return p
 
-async def make_voice(text, output):
-    # Native Burmese neural voice; retry once at a slightly faster rate if a section exceeds its 30s slot.
-    for rate in ("+0%", "+12%"):
-        await edge_tts.Communicate(text, VOICE, rate=rate, pitch="-1Hz").save(str(output))
-        if not output.exists() or output.stat().st_size < 1000:
-            raise RuntimeError(f"Empty TTS audio for {output.name}")
-        if duration(output) <= 28.0:
-            return
-    raise RuntimeError(f"Burmese narration for {output.name} exceeds its 30-second scene slot. Shorten the narration.")
+def make_voice(text, output):
+    if not DEEPGRAM_API_KEY:
+        raise RuntimeError("Missing DEEPGRAM_API_KEY GitHub Secret. English narration must use Deepgram.")
+    url = f"https://api.deepgram.com/v1/speak?model={DEEPGRAM_MODEL}&encoding=mp3"
+    response = requests.post(
+        url,
+        headers={"Authorization": f"Token {DEEPGRAM_API_KEY}", "Content-Type": "application/json"},
+        json={"text": text},
+        timeout=180
+    )
+    if response.status_code != 200:
+        raise RuntimeError(f"Deepgram TTS failed ({response.status_code}): {response.text[:800]}")
+    if len(response.content) < 1000:
+        raise RuntimeError("Deepgram returned an empty audio response")
+    output.write_bytes(response.content)
+    seconds = duration(output)
+    if seconds > 28.0:
+        raise RuntimeError(f"English narration is too long for its 30-second scene: {seconds:.2f}s")
+    print(f"Deepgram voice verified: model={DEEPGRAM_MODEL}, duration={seconds:.2f}s")
+
 
 def srt_stamp(seconds):
     ms = int(round(seconds * 1000))
@@ -141,18 +152,42 @@ def srt_stamp(seconds):
     s, ms = divmod(ms, 1000)
     return f"{h:02}:{m:02}:{s:02},{ms:03}"
 
-def make_subtitle(text, path):
-    # One comfortably readable Myanmar Unicode caption per 30-second scene.
-    path.write_text(
-        "1\n" + f"{srt_stamp(0)} --> {srt_stamp(29.7)}\n" + text.strip() + "\n",
-        encoding="utf-8"
-    )
+def make_subtitle(text, audio_seconds, path):
+    # Time each Burmese caption against the English narration duration.
+    sentences = [x.strip() for x in text.replace("။", "။|").split("|") if x.strip()]
+    if not sentences:
+        sentences = [text.strip()]
+    weights = [max(1, len(x)) for x in sentences]
+    total = sum(weights)
+    cursor = 0.35
+    end_limit = max(cursor + 1.0, min(audio_seconds, 29.5))
+    lines = []
+    for i, (sentence, weight) in enumerate(zip(sentences, weights)):
+        end = end_limit if i == len(sentences) - 1 else cursor + (end_limit - 0.35) * weight / total
+        words = sentence.split()
+        wrapped, current = [], ""
+        for word in words:
+            candidate = (current + " " + word).strip()
+            if len(candidate) > 34 and current:
+                wrapped.append(current)
+                current = word
+            else:
+                current = candidate
+        if current:
+            wrapped.append(current)
+        if not wrapped:
+            wrapped = [sentence]
+        caption = r"\N".join(wrapped[:2])
+        lines.append(f"{i+1}\n{srt_stamp(cursor)} --> {srt_stamp(end)}\n{caption}\n")
+        cursor = end
+    path.write_text("\n".join(lines), encoding="utf-8")
+
 
 def main():
     for tool in ("ffmpeg", "ffprobe"):
         subprocess.run(["bash", "-lc", f"command -v {tool} >/dev/null"], check=True)
-    if len(STORY) != 10:
-        raise RuntimeError(f"Expected 10 scenes, found {len(STORY)}")
+    if len(STORY) != 10 or any(not x.get("narration_en") or not x.get("narration_mm") for x in STORY):
+        raise RuntimeError("Expected 10 scenes, each with English narration and Burmese subtitle text")
     ASSETS.mkdir(exist_ok=True)
     IMAGES.mkdir(parents=True, exist_ok=True)
     WORK.mkdir(exist_ok=True)
@@ -165,9 +200,9 @@ def main():
         print(f"Preparing scene {i}/10: {scene['title']}")
         image = make_scene_image(i, scene)
         audio = WORK / f"voice_{i:02d}.mp3"
-        asyncio.run(make_voice(scene["narration_mm"], audio))
+        make_voice(scene["narration_en"], audio)
         subs = WORK / f"subtitle_{i:02d}.srt"
-        make_subtitle(scene["narration_mm"], subs)
+        make_subtitle(scene["narration_mm"], duration(audio), subs)
         clip = WORK / f"clip_{i:02d}.mp4"
         vf = (
             "zoompan=z='min(zoom+0.00025,1.06)':"
@@ -226,7 +261,7 @@ def main():
     if video.get("r_frame_rate") != "24/1":
         raise RuntimeError(f"Unexpected frame rate: {video.get('r_frame_rate')}")
     print(f"VERIFIED MP4: {VIDEO} | {seconds:.2f}s | {int(info['format']['size'])/1048576:.1f} MB")
-    print(f"VOICE: {VOICE} | Burmese Unicode subtitles | 10 unique credited visuals")
+    print(f"VOICE: Deepgram {DEEPGRAM_MODEL} (English) | Burmese Unicode subtitles | 10 unique credited visuals")
     # Thumbnail uses the first documentary scene, with the final brand overlay.
     thumb = OUT / "GI-KO-KO-AREA51-2026-THUMBNAIL.jpg"
     run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", "00:00:04",
