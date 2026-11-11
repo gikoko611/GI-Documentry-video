@@ -299,7 +299,7 @@ def make_subtitle(text, audio_seconds, path):
         end = end_limit if i == len(sentences) - 1 else cursor + (end_limit - 0.35) * weight / total
         wrapped = wrap_myanmar_pixels(sentence, max_width=610, size=20)
         # Keep all text; long captions can use 2–3 compact lines.
-        caption = r"\N".join(wrapped)
+        caption = "\n".join(wrapped)
         entries.append(f"{i+1}\n{srt_stamp(cursor)} --> {srt_stamp(end)}\n{caption}\n")
         cursor = end
     path.write_text("\n".join(entries), encoding="utf-8")
