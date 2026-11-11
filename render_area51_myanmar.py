@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""G.I KO KO — Area 51: 2026 files | 5 min | Burmese voice | 9:16."""
+"""G.I KO KO — Area 51: 2026 files | 5 min | Deepgram English voice + Myanmar subtitles | 9:16."""
 import asyncio, hashlib, io, json, os, subprocess, time
 from pathlib import Path
 import requests
@@ -49,8 +49,21 @@ def commons_image(queries, index):
             "iiprop": "url|extmetadata", "iiurlwidth": 1600, "format": "json"
         }
         try:
-            data = requests.get(endpoint, params=params, headers=UA, timeout=50)
-            data.raise_for_status()
+            data = None
+            for attempt in range(4):
+                data = requests.get(endpoint, params=params, headers=UA, timeout=50)
+                if data.status_code in (429, 500, 502, 503, 504) and attempt < 3:
+                    retry_after = data.headers.get("Retry-After", "")
+                    try:
+                        wait_seconds = float(retry_after)
+                    except (TypeError, ValueError):
+                        wait_seconds = 2 ** attempt
+                    wait_seconds = min(max(wait_seconds, 1), 20)
+                    print(f"Commons HTTP {data.status_code}; retrying in {wait_seconds:.0f}s")
+                    time.sleep(wait_seconds)
+                    continue
+                data.raise_for_status()
+                break
             pages = data.json().get("query", {}).get("pages", {})
         except Exception as exc:
             print(f"Commons query failed ({query}): {exc}")
@@ -66,8 +79,21 @@ def commons_image(queries, index):
             if not reusable or not url:
                 continue
             try:
-                response = requests.get(url, headers=UA, timeout=60)
-                response.raise_for_status()
+                response = None
+                for attempt in range(4):
+                    response = requests.get(url, headers=UA, timeout=60)
+                    if response.status_code in (429, 500, 502, 503, 504) and attempt < 3:
+                        retry_after = response.headers.get("Retry-After", "")
+                        try:
+                            wait_seconds = float(retry_after)
+                        except (TypeError, ValueError):
+                            wait_seconds = 2 ** attempt
+                        wait_seconds = min(max(wait_seconds, 1), 20)
+                        print(f"Image server HTTP {response.status_code}; retrying in {wait_seconds:.0f}s")
+                        time.sleep(wait_seconds)
+                        continue
+                    response.raise_for_status()
+                    break
                 raw = response.content
                 digest = hashlib.sha256(raw).hexdigest()
                 if digest in USED:
@@ -86,10 +112,83 @@ def commons_image(queries, index):
                 return target
             except Exception as exc:
                 print(f"Skipping image candidate: {exc}")
-    raise RuntimeError(f"No unique, reusable Wikimedia Commons image found for scene {index}. Queries: {queries}")
+    print(f"No reusable Commons image found for scene {index}; creating original scene artwork.")
+    return None
+
+def make_original_scene_art(index, scene):
+    """Create a distinct, topic-matched fallback visual; never reuse another scene's photo."""
+    im = Image.new("RGB", (W, H))
+    px = im.load()
+    for y in range(H):
+        t = y / max(1, H - 1)
+        top = (7, 18, 35)
+        bottom = (105, 82, 57) if index in (2, 5, 9, 10) else (24, 47, 68)
+        color = tuple(int(top[k] * (1 - t) + bottom[k] * t) for k in range(3))
+        for x in range(W):
+            px[x, y] = color
+    d = ImageDraw.Draw(im, "RGBA")
+    # Star field and distant mountain silhouettes.
+    for n in range(95):
+        x = (n * 97 + index * 53) % W
+        y = (n * 43 + index * 29) % 520
+        r = 1 + (n % 3 == 0)
+        d.ellipse((x-r, y-r, x+r, y+r), fill=(210, 225, 235, 150))
+    d.polygon([(0, 690), (110, 510), (235, 700), (390, 470), (560, 700), (720, 520), (720, 850), (0, 850)],
+              fill=(24, 35, 43, 255))
+    d.polygon([(0, 790), (170, 650), (310, 820), (500, 630), (720, 800), (720, 1000), (0, 1000)],
+              fill=(48, 48, 43, 255))
+    d.rectangle((0, 850, W, H), fill=(75, 65, 51, 255))
+    # Scene-specific, original vector motifs.
+    if index == 5:  # Restricted perimeter and warning sign
+        for x in range(35, 710, 55):
+            d.line((x, 640, x, 1100), fill=(30, 35, 39, 255), width=8)
+        for y in (730, 850, 970):
+            d.line((20, y, 700, y-25), fill=(28, 33, 38, 255), width=7)
+        d.rounded_rectangle((205, 500, 515, 720), radius=12, fill=(180, 145, 70, 255), outline=(25, 28, 30, 255), width=9)
+        d.text((235, 545), "RESTRICTED", font=font(32, True), fill=(20, 24, 27, 255))
+        d.text((265, 600), "AREA 51", font=font(38, True), fill=(20, 24, 27, 255))
+    elif index in (3, 4, 6):  # Aircraft silhouette
+        cx, cy = 360, 650
+        d.polygon([(cx-250, cy), (cx-40, cy-24), (cx+15, cy-175), (cx+55, cy-180),
+                   (cx+40, cy-28), (cx+250, cy), (cx+40, cy+25), (cx+5, cy+105),
+                   (cx-25, cy+105), (cx-35, cy+25)], fill=(8, 14, 20, 245))
+        d.line((cx-220, cy+5, cx+220, cy+5), fill=(130, 190, 210, 150), width=3)
+        d.ellipse((cx-5, cy-18, cx+20, cy+8), fill=(95, 180, 205, 200))
+    elif index in (7, 8):  # UAP sensor/radar graphic
+        cx, cy = 360, 690
+        for radius in (120, 220, 320):
+            d.ellipse((cx-radius, cy-radius, cx+radius, cy+radius), outline=(80, 210, 190, 180), width=3)
+        d.line((cx, cy-340, cx, cy+340), fill=(80, 210, 190, 150), width=2)
+        d.line((cx-340, cy, cx+340, cy), fill=(80, 210, 190, 150), width=2)
+        d.line((cx, cy, cx+210, cy-170), fill=(120, 240, 210, 230), width=5)
+        d.ellipse((cx+185, cy-195, cx+215, cy-165), fill=(255, 220, 120, 255))
+    elif index == 9:  # Hangar / runway
+        d.polygon([(120, 720), (210, 560), (510, 560), (600, 720)], fill=(17, 25, 31, 255), outline=(115, 145, 155, 255))
+        d.rectangle((210, 650, 510, 850), fill=(8, 15, 22, 255), outline=(110, 135, 145, 255), width=5)
+        d.polygon([(330, 850), (390, 850), (570, 1280), (150, 1280)], fill=(110, 103, 87, 255))
+        for yy in range(900, 1250, 90):
+            d.line((360, yy, 360, yy+35), fill=(230, 210, 160, 200), width=5)
+    elif index == 10:  # Sunset close
+        d.ellipse((235, 430, 485, 680), fill=(240, 170, 90, 220))
+        d.polygon([(0, 780), (190, 650), (330, 790), (520, 620), (720, 770), (720, 1280), (0, 1280)],
+                  fill=(35, 38, 37, 255))
+    else:
+        # Abstract intelligence dossier motif for any other missing scene.
+        d.rounded_rectangle((150, 470, 570, 930), radius=20, fill=(9, 24, 36, 235), outline=(90, 190, 205, 220), width=4)
+        d.text((195, 530), "CLASSIFIED FILE", font=font(30, True), fill=(140, 220, 230, 255))
+        for yy in (620, 690, 760, 830):
+            d.line((200, yy, 520, yy), fill=(170, 190, 195, 190), width=5)
+    target = IMAGES / f"original_scene_{index:02d}.jpg"
+    im.save(target, quality=94, optimize=True)
+    with (ASSETS / "ATTRIBUTION_AREA51.txt").open("a", encoding="utf-8") as f:
+        f.write(f"Scene {index:02d}: Original scene-specific artwork generated by G.I KO KO Documentary Studio; no external image source.\n\n")
+    print(f"Original fallback artwork created for scene {index}: {scene['title']}")
+    return target
 
 def make_scene_image(index, scene):
     source = commons_image(scene["visual_queries"], index)
+    if source is None:
+        source = make_original_scene_art(index, scene)
     im = Image.open(source).convert("RGB")
     iw, ih = im.size
     scale = max(W / iw, H / ih)
