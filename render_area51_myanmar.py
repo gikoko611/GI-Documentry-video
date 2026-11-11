@@ -251,35 +251,58 @@ def srt_stamp(seconds):
     s, ms = divmod(ms, 1000)
     return f"{h:02}:{m:02}:{s:02},{ms:03}"
 
+def myanmar_graphemes(text):
+    # Keep Myanmar combining marks and kinzi/stacked consonants together.
+    import unicodedata
+    clusters, current = [], ""
+    previous = ""
+    for ch in text:
+        category = unicodedata.category(ch)
+        if not current or category.startswith("M") or previous in ("\u1039", "\u200d"):
+            current += ch
+        else:
+            clusters.append(current)
+            current = ch
+        previous = ch
+    if current:
+        clusters.append(current)
+    return clusters
+
+
+def wrap_myanmar_pixels(text, max_width=610, size=20):
+    face = font(size)
+    lines, current = [], ""
+    for cluster in myanmar_graphemes(text):
+        candidate = current + cluster
+        if current and face.getlength(candidate) > max_width:
+            lines.append(current.rstrip())
+            current = cluster.lstrip()
+        else:
+            current = candidate
+    if current.strip():
+        lines.append(current.rstrip())
+    return lines or [text]
+
+
 def make_subtitle(text, audio_seconds, path):
-    # Time each Burmese caption against the English narration duration.
+    # Burmese has no spaces between every word; wrap by Padauk pixel width,
+    # not Python character count. This prevents captions running off-screen.
     sentences = [x.strip() for x in text.replace("။", "။|").split("|") if x.strip()]
     if not sentences:
         sentences = [text.strip()]
-    weights = [max(1, len(x)) for x in sentences]
+    weights = [max(1, len(myanmar_graphemes(x))) for x in sentences]
     total = sum(weights)
     cursor = 0.35
     end_limit = max(cursor + 1.0, min(audio_seconds, 29.5))
-    lines = []
+    entries = []
     for i, (sentence, weight) in enumerate(zip(sentences, weights)):
         end = end_limit if i == len(sentences) - 1 else cursor + (end_limit - 0.35) * weight / total
-        words = sentence.split()
-        wrapped, current = [], ""
-        for word in words:
-            candidate = (current + " " + word).strip()
-            if len(candidate) > 34 and current:
-                wrapped.append(current)
-                current = word
-            else:
-                current = candidate
-        if current:
-            wrapped.append(current)
-        if not wrapped:
-            wrapped = [sentence]
-        caption = "\n".join(wrapped[:2])
-        lines.append(f"{i+1}\n{srt_stamp(cursor)} --> {srt_stamp(end)}\n{caption}\n")
+        wrapped = wrap_myanmar_pixels(sentence, max_width=610, size=20)
+        # Keep all text; long captions can use 2–3 compact lines.
+        caption = r"\N".join(wrapped)
+        entries.append(f"{i+1}\n{srt_stamp(cursor)} --> {srt_stamp(end)}\n{caption}\n")
         cursor = end
-    path.write_text("\n".join(lines), encoding="utf-8")
+    path.write_text("\n".join(entries), encoding="utf-8")
 
 
 def main():
@@ -308,9 +331,9 @@ def main():
             "x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
             "d=1:s=720x1280:fps=24,"
             f"subtitles=filename='{subs.as_posix()}':fontsdir='/usr/share/fonts/truetype/padauk':"
-            "force_style='FontName=Padauk,FontSize=24,PrimaryColour=&H00FFFFFF,"
-            "OutlineColour=&HCC000000,BorderStyle=1,Outline=3,Shadow=1,"
-            "Alignment=2,MarginL=42,MarginR=42,MarginV=145'"
+            "force_style='FontName=Padauk,FontSize=20,PrimaryColour=&H00FFFFFF,"
+            "OutlineColour=&HCC000000,BorderStyle=1,Outline=2,Shadow=1,"
+            "Alignment=2,MarginL=55,MarginR=55,MarginV=125'"
         )
         fc = (
             "[1:a]aresample=44100,apad=pad_dur=30,atrim=duration=30,volume=1.0[voice];"
