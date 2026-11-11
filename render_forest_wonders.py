@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """G.I KO KO — The Hidden Wonders of the Forest (10-minute documentary)."""
-import hashlib, json, os, re, subprocess, time
+import hashlib, json, os, re, subprocess, time, unicodedata
 from pathlib import Path
 import requests
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
@@ -294,7 +294,8 @@ def main():
     cursor = 0.0
     for n, record in enumerate(line_records, 1):
         end = cursor + record["duration"]
-        caption = record["mm"].replace("\r", "").strip()
+        # Keep subtitle text in normalized Unicode; never convert to Zawgyi.
+        caption = unicodedata.normalize("NFC", record["mm"].replace("\r", "").strip())
         srt_entries.extend([str(n), f"{srt_time(cursor)} --> {srt_time(end)}", caption, ""])
         cursor = end
     srt_path = WORK / "myanmar_subtitles.srt"
@@ -371,9 +372,12 @@ def main():
     hero.convert("RGB").save(THUMB, quality=94, optimize=True)
 
     print("STEP 5/5 — Burning Padauk Myanmar subtitles and final G.I branding...")
+    # libass performs Myanmar complex-script shaping through HarfBuzz/FriBidi.
+    # Use Noto Sans Myanmar as the primary family; Padauk remains installed as fallback.
+    noto_font_dir = os.environ.get("NOTO_MYANMAR_FONT_DIR", "/usr/share/fonts/truetype/noto")
     subtitle_filter = (
-        f"subtitles=filename='{srt_path.as_posix()}':fontsdir='/usr/share/fonts/truetype/padauk':"
-        "force_style='FontName=Padauk,FontSize=24,PrimaryColour=&H00FFFFFF,"
+        f"subtitles=filename='{srt_path.as_posix()}':fontsdir='{noto_font_dir}':"
+        "force_style='FontName=Noto Sans Myanmar,FontSize=24,PrimaryColour=&H00FFFFFF,"
         "OutlineColour=&H00101010,BorderStyle=1,Outline=3,Shadow=1,Alignment=2,MarginV=100'"
     )
     filter_complex = f"[0:v]{subtitle_filter}[sub];[sub][2:v]overlay=24:24:format=auto[v]"
