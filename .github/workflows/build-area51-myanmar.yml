@@ -62,13 +62,13 @@ jobs:
           THUMB="output/GI-KO-KO-AREA51-2026-THUMBNAIL.jpg"
           test -s "$VIDEO"
           test -s "$THUMB"
-          ffprobe -v error -show_entries stream=codec_name,width,height,r_frame_rate -show_entries format=duration,size -of json "$VIDEO"
+          ffprobe -v error -show_entries stream=codec_type,codec_name,width,height,r_frame_rate -show_entries format=duration,size -of json "$VIDEO"
           python - <<'PY'
           import json, subprocess
           p = "output/GI-KO-KO-AREA51-2026-MYANMAR-5MIN-720x1280.mp4"
           d = json.loads(subprocess.check_output([
               "ffprobe", "-v", "error", "-show_entries",
-              "stream=codec_name,width,height,r_frame_rate:format=duration",
+              "stream=codec_type,codec_name,width,height,r_frame_rate:format=duration",
               "-of", "json", p
           ], text=True))
           v = next(s for s in d["streams"] if s["codec_type"] == "video")
